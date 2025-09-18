@@ -25,6 +25,33 @@ INSTANCE_RE = re.compile(r"^i-[0-9a-fA-F]{8,17}$")
 def authorized(user_id):
     return user_id in ALLOWED_USERS
 
+# --- START / WELCOME ---
+def start(update, context):
+    if not authorized(update.effective_user.id):
+        return update.message.reply_text("Unauthorized.")
+    welcome = (
+        "👋 Welcome to your AWS Manager Bot!\n\n"
+        "I can help you manage your AWS EC2 instances directly from Telegram.\n"
+        "Type /help to see all available commands."
+    )
+    update.message.reply_text(welcome)
+
+# --- HELP / COMMAND LIST ---
+def help_command(update, context):
+    if not authorized(update.effective_user.id):
+        return update.message.reply_text("Unauthorized.")
+    commands = (
+        "📌 *Available Commands:*\n\n"
+        "/list – List all EC2 instances\n"
+        "/terminate <instance-id> – Terminate an instance (requires AllowTerminate=true tag)\n"
+        # Future commands placeholders:
+        # "/start_instance <id> – Start an instance\n"
+        # "/stop_instance <id> – Stop an instance\n"
+        # "/reboot_instance <id> – Reboot an instance\n"
+    )
+    update.message.reply_text(commands, parse_mode="Markdown")
+
+# --- LIST INSTANCES ---
 def list_instances(update, context):
     if not authorized(update.effective_user.id):
         return update.message.reply_text("Unauthorized.")
@@ -38,6 +65,7 @@ def list_instances(update, context):
             lines.append(f"{iid} — {name or '-'} — {state}")
     update.message.reply_text("\n".join(lines) or "No instances found.")
 
+# --- TERMINATE INSTANCE ---
 def terminate_instance(update, context):
     if not authorized(update.effective_user.id):
         return update.message.reply_text("Unauthorized.")
@@ -70,12 +98,18 @@ def handle_callback(update, context):
     elif data == "cancel":
         query.edit_message_text("Cancelled.")
 
+# --- MAIN BOT ---
 def main():
     updater = Updater(token=TOKEN, use_context=True)
     dp = updater.dispatcher
+
+    # Handlers
+    dp.add_handler(CommandHandler("start", start))
+    dp.add_handler(CommandHandler("help", help_command))
     dp.add_handler(CommandHandler("list", list_instances))
     dp.add_handler(CommandHandler("terminate", terminate_instance))
     dp.add_handler(CallbackQueryHandler(handle_callback))
+
     updater.start_polling()
     updater.idle()
 
