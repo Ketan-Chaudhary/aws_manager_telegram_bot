@@ -1,5 +1,4 @@
-import boto3, os, json, re
-import logging
+import boto3, os, re, logging
 from telegram import InlineKeyboardMarkup, InlineKeyboardButton
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
@@ -43,11 +42,10 @@ def help_command(update, context):
     commands = (
         "📌 *Available Commands:*\n\n"
         "/list – List all EC2 instances\n"
-        "/terminate <instance-id> – Terminate an instance (requires AllowTerminate=true tag)\n"
-        # Future commands placeholders:
-        # "/start_instance <id> – Start an instance\n"
-        # "/stop_instance <id> – Stop an instance\n"
-        # "/reboot_instance <id> – Reboot an instance\n"
+        "/terminate <instance-id> – Terminate an instance\n"
+        "/start_instance <id> – Start an instance\n"
+        "/stop_instance <id> – Stop an instance\n"
+        "/reboot_instance <id> – Reboot an instance\n"
     )
     update.message.reply_text(commands, parse_mode="Markdown")
 
@@ -78,6 +76,37 @@ def terminate_instance(update, context):
     ])
     update.message.reply_text(f"Confirm termination for {iid}?", reply_markup=keyboard)
 
+# --- START INSTANCE ---
+def start_instance(update, context):
+    if not authorized(update.effective_user.id):
+        return update.message.reply_text("Unauthorized.")
+    if len(context.args) != 1 or not INSTANCE_RE.match(context.args[0]):
+        return update.message.reply_text("Usage: /start_instance <instance-id>")
+    iid = context.args[0]
+    ec2.start_instances(InstanceIds=[iid])
+    update.message.reply_text(f"✅ Start initiated for {iid}")
+
+# --- STOP INSTANCE ---
+def stop_instance(update, context):
+    if not authorized(update.effective_user.id):
+        return update.message.reply_text("Unauthorized.")
+    if len(context.args) != 1 or not INSTANCE_RE.match(context.args[0]):
+        return update.message.reply_text("Usage: /stop_instance <instance-id>")
+    iid = context.args[0]
+    ec2.stop_instances(InstanceIds=[iid])
+    update.message.reply_text(f"🛑 Stop initiated for {iid}")
+
+# --- REBOOT INSTANCE ---
+def reboot_instance(update, context):
+    if not authorized(update.effective_user.id):
+        return update.message.reply_text("Unauthorized.")
+    if len(context.args) != 1 or not INSTANCE_RE.match(context.args[0]):
+        return update.message.reply_text("Usage: /reboot_instance <instance-id>")
+    iid = context.args[0]
+    ec2.reboot_instances(InstanceIds=[iid])
+    update.message.reply_text(f"🔄 Reboot initiated for {iid}")
+
+# --- CALLBACK HANDLER (Terminate Confirmation) ---
 def handle_callback(update, context):
     query = update.callback_query
     query.answer()
@@ -88,11 +117,6 @@ def handle_callback(update, context):
     data = query.data
     if data.startswith("terminate:"):
         iid = data.split(":")[1]
-        # check AllowTerminate tag
-        res = ec2.describe_instances(InstanceIds=[iid])
-        tags = {t["Key"]: t["Value"] for t in res["Reservations"][0]["Instances"][0].get("Tags", [])}
-        # if tags.get("AllowTerminate") != "true":
-        #     return query.edit_message_text("Termination not allowed (missing tag).")
         ec2.terminate_instances(InstanceIds=[iid])
         query.edit_message_text(f"Termination started for {iid}.")
     elif data == "cancel":
@@ -108,6 +132,9 @@ def main():
     dp.add_handler(CommandHandler("help", help_command))
     dp.add_handler(CommandHandler("list", list_instances))
     dp.add_handler(CommandHandler("terminate", terminate_instance))
+    dp.add_handler(CommandHandler("start_instance", start_instance))
+    dp.add_handler(CommandHandler("stop_instance", stop_instance))
+    dp.add_handler(CommandHandler("reboot_instance", reboot_instance))
     dp.add_handler(CallbackQueryHandler(handle_callback))
 
     updater.start_polling()
