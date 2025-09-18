@@ -6,7 +6,7 @@ from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-region = os.getenv("AWS_REGION", "us-east-1")
+region = os.getenv("AWS_REGION", "ap-south-1")
 ssm = boto3.client("ssm", region_name=region)
 ec2 = boto3.client("ec2", region_name=region)
 
