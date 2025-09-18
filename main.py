@@ -1,6 +1,5 @@
 import boto3, os, re, logging
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update
-from telegram.constants import ParseMode
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update, ParseMode
 from telegram.ext import (
     ApplicationBuilder,
     CommandHandler,
