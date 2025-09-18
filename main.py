@@ -18,7 +18,7 @@ def get_bot_token():
 TOKEN = get_bot_token()
 
 # --- Whitelisted users (replace with your Telegram ID) ---
-ALLOWED_USERS = [123456789]
+ALLOWED_USERS = [8498983488]
 
 INSTANCE_RE = re.compile(r"^i-[0-9a-fA-F]{8,17}$")
 
