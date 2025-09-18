@@ -25,20 +25,20 @@ def authorized(user_id):
     return user_id in ALLOWED_USERS
 
 # --- START / WELCOME ---
-def start(update, context):
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not authorized(update.effective_user.id):
-        return update.message.reply_text("Unauthorized.")
+        return await update.message.reply_text("Unauthorized.")
     welcome = (
         "👋 Welcome to your AWS Manager Bot!\n\n"
         "I can help you manage your AWS EC2 instances directly from Telegram.\n"
         "Type /help to see all available commands."
     )
-    update.message.reply_text(welcome)
+    await update.message.reply_text(welcome)
 
 # --- HELP / COMMAND LIST ---
-def help_command(update, context):
+async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not authorized(update.effective_user.id):
-        return update.message.reply_text("Unauthorized.")
+        return await update.message.reply_text("Unauthorized.")
     commands = (
         "📌 *Available Commands:*\n\n"
         "/list – List all EC2 instances\n"
@@ -47,7 +47,7 @@ def help_command(update, context):
         "/stop_instance <id> – Stop an instance\n"
         "/reboot_instance <id> – Reboot an instance\n"
     )
-    update.message.reply_text(commands, parse_mode="Markdown")
+    await update.message.reply_text(commands, parse_mode=ParseMode.MARKDOWN)
 
 # --- LIST INSTANCES ---
 def list_instances(update, context):
