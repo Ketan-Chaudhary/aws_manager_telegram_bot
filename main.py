@@ -1,11 +1,6 @@
 import boto3, os, re, logging
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, Update, ParseMode
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    CallbackQueryHandler,
-    ContextTypes,
-)
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
+from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
 
 logging.basicConfig(level=logging.INFO)
