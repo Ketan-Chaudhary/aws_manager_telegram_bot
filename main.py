@@ -63,8 +63,8 @@ def handle_callback(update, context):
         # check AllowTerminate tag
         res = ec2.describe_instances(InstanceIds=[iid])
         tags = {t["Key"]: t["Value"] for t in res["Reservations"][0]["Instances"][0].get("Tags", [])}
-        if tags.get("AllowTerminate") != "true":
-            return query.edit_message_text("Termination not allowed (missing tag).")
+        # if tags.get("AllowTerminate") != "true":
+        #     return query.edit_message_text("Termination not allowed (missing tag).")
         ec2.terminate_instances(InstanceIds=[iid])
         query.edit_message_text(f"Termination started for {iid}.")
     elif data == "cancel":
