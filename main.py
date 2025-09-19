@@ -1,5 +1,6 @@
 import boto3, os, re, logging
-from telegram import InlineKeyboardMarkup, InlineKeyboardButton, ParseMode
+from telegram import InlineKeyboardMarkup, InlineKeyboardButton
+from telegram import ParseMode
 from telegram.ext import Updater, CommandHandler, CallbackQueryHandler
 
 logging.basicConfig(level=logging.INFO)
@@ -38,15 +39,18 @@ def start(update, context):
 def help_command(update, context):
     if not authorized(update.effective_user.id):
         return update.message.reply_text("Unauthorized.")
+    # Using MarkdownV2 and backticks (`) for safer, better formatting
     commands = (
         "📌 *Available Commands:*\n\n"
-        "/list – List all EC2 instances\n"
-        "/terminate <instance-id> – Terminate an instance\n"
-        "/start_instance <id> – Start an instance\n"
-        "/stop_instance <id> – Stop an instance\n"
-        "/reboot_instance <id> – Reboot an instance\n"
+        "`/list` – List all EC2 instances\n"
+        "`/terminate <instance-id>` – Terminate an instance\n"
+        "`/start_instance <instance-id>` – Start an instance\n"
+        "`/stop_instance <instance-id>` – Stop an instance\n"
+        "`/reboot_instance <instance-id>` – Reboot an instance"
     )
-    update.message.reply_text(commands, parse_mode=ParseMode.MARKDOWN)
+
+    # Switched to MARKDOWN_V2
+    update.message.reply_text(commands, parse_mode=ParseMode.MARKDOWN_V2)
 
 # --- LIST INSTANCES ---
 def list_instances(update, context):
