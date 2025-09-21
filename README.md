@@ -115,6 +115,3 @@ Start a chat with your bot on Telegram and try:
 PRs and issues are welcome! Please open a discussion if you’d like to suggest new features.
 
 ---
-
-
-Do you want me to also **add screenshots/GIFs** (like showing `/list` output in Telegram) in the README for a more professional look?
