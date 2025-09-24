@@ -118,8 +118,8 @@ def help_command(update, context):
         "`/allocate_eip` – Allocate a new Elastic IP\n"
         "`/associate_eip <alloc_id> <inst_id>` – Associate EIP\n"
         "`/release_eip <alloc_id>` – Release an EIP\n"
-        "`/add_ip <sg_id> <port>` – Add your IP to a Security Group\n"
-        "`/remove_ip <sg_id> <port>` – Remove your IP from a SG\n"
+        "`/add_ip <sg_id> <port> [direction]` – Add your IP to a Security Group\n"
+        "`/remove_ip <sg_id> <port> [direction]` – Remove your IP from a SG\n"
     )
     update.message.reply_text(commands, parse_mode=ParseMode.MARKDOWN_V2)
 
@@ -154,7 +154,7 @@ def list_instances(update, context):
                         InlineKeyboardButton("💥 Terminate", callback_data=f"terminate_confirm1:{iid}")
                     ]
                 ])
-                # FINAL FIX: Send the message as plain text to guarantee it never fails.
+                # Send the message as plain text to guarantee it never fails.
                 msg = f"Name: {name}\nID: {iid}\nState: {state}"
                 update.message.reply_text(msg, reply_markup=keyboard)
 
@@ -168,10 +168,6 @@ def list_instances(update, context):
         update.message.reply_text(error_msg)
 
 
-# ... (The rest of the code remains the same as the previous full version)
-# I am including the full code again below for completeness.
-
-@user_authorized
 @user_authorized
 def describe_instance(update, context):
     user_id = update.effective_user.id
@@ -184,8 +180,6 @@ def describe_instance(update, context):
         resp = ec2.describe_instances(InstanceIds=[iid])
         i = resp["Reservations"][0]["Instances"][0]
 
-        # --- MODIFICATION IS HERE ---
-        # Create a formatted list of Security Group names and IDs
         sg_details = [f"{sg['GroupName']} ({sg['GroupId']})" for sg in i.get('SecurityGroups', [])]
 
         name = escape_markdown(next((t["Value"] for t in i.get("Tags", []) if t["Key"] == "Name"), "-"))
@@ -198,7 +192,7 @@ def describe_instance(update, context):
             f"⚡ *State:* `{escape_markdown(i['State']['Name'])}`\n"
             f"🌐 *Public IP:* `{escape_markdown(i.get('PublicIpAddress', '-'))}`\n"
             f"🔒 *Private IP:* `{escape_markdown(i.get('PrivateIpAddress', '-'))}`\n"
-            f"🛡 *SGs:* `{escape_markdown(', '.join(sg_details))}`\n"  # Use the new formatted list
+            f"🛡 *SGs:* `{escape_markdown(', '.join(sg_details))}`\n"
             f"⏱ *Launch Time:* `{escape_markdown(i['LaunchTime'].strftime('%Y-%m-%d %H:%M'))}`"
         )
         update.message.reply_text(details, parse_mode=ParseMode.MARKDOWN_V2)
@@ -285,7 +279,7 @@ def release_eip(update, context):
 
 @admin_only
 def add_ip_to_sg(update, context):
-    # New Usage: /add_ip <sg-id> <port> [inbound|outbound]
+    # Usage: /add_ip <sg-id> <port> [inbound|outbound]
     if not (2 <= len(context.args) <= 3) or not SG_RE.match(context.args[0]):
         return update.message.reply_text("Usage: `/add_ip <sg-id> <port> [inbound|outbound]`",
                                          parse_mode=ParseMode.MARKDOWN_V2)
@@ -297,15 +291,17 @@ def add_ip_to_sg(update, context):
 
     log_action(update.effective_user.id, f"/add_ip ({direction})", f"{sg_id}:{port}")
 
-    msg = update.message.reply_text(f"🚀 Adding rule to `{escape_markdown(sg_id)}`...")
-
     try:
+        # Perform all actions *before* sending a reply
         ip = requests.get('https://api.ipify.org').text
         ip_permission = {
             'IpProtocol': 'tcp',
             'FromPort': int(port),
             'ToPort': int(port),
-            'IpRanges': [{'CidrIp': f'{ip}/32'}]
+            'IpRanges': [{
+                'CidrIp': f'{ip}/32',
+                'Description': f'Added by TelegramBot for user {update.effective_user.id} on {datetime.date.today().isoformat()}'
+            }]
         }
 
         if direction == 'inbound':
@@ -313,17 +309,24 @@ def add_ip_to_sg(update, context):
         else:  # outbound
             ec2.authorize_security_group_egress(GroupId=sg_id, IpPermissions=[ip_permission])
 
-        msg.edit_text(
-            f"✅ IP `{escape_markdown(ip)}` added to `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}` ({direction})",
-            parse_mode=ParseMode.MARKDOWN_V2)
+        # If we reach here, it was successful. Send one clear success message.
+        success_message = (
+            f"✅ *Rule Added Successfully*\n\n"
+            f"Added `{escape_markdown(ip)}/32` to `{escape_markdown(sg_id)}`\n"
+            f"on port `{escape_markdown(port)}` for `{direction}` traffic\."
+        )
+        update.message.reply_text(success_message, parse_mode=ParseMode.MARKDOWN_V2)
+
     except Exception as e:
-        logger.error("Error in /add_ip: %s", e)
-        msg.edit_text(f"❌ Error adding rule: {str(e)}")
+        logger.error("Error in /add_ip for user %s: %s", update.effective_user.id, e)
+        # If anything failed, send one clear, plain-text error message.
+        error_message = f"❌ An error occurred:\n\n{str(e)}"
+        update.message.reply_text(error_message)
 
 
 @admin_only
 def remove_ip_from_sg(update, context):
-    # New Usage: /remove_ip <sg-id> <port> [inbound|outbound]
+    # Usage: /remove_ip <sg-id> <port> [inbound|outbound]
     if not (2 <= len(context.args) <= 3) or not SG_RE.match(context.args[0]):
         return update.message.reply_text("Usage: `/remove_ip <sg-id> <port> [inbound|outbound]`",
                                          parse_mode=ParseMode.MARKDOWN_V2)
@@ -335,9 +338,8 @@ def remove_ip_from_sg(update, context):
 
     log_action(update.effective_user.id, f"/remove_ip ({direction})", f"{sg_id}:{port}")
 
-    msg = update.message.reply_text(f"🚀 Removing rule from `{escape_markdown(sg_id)}`...")
-
     try:
+        # Perform all actions *before* sending a reply
         ip = requests.get('https://api.ipify.org').text
         ip_permission = {
             'IpProtocol': 'tcp',
@@ -351,12 +353,19 @@ def remove_ip_from_sg(update, context):
         else:  # outbound
             ec2.revoke_security_group_egress(GroupId=sg_id, IpPermissions=[ip_permission])
 
-        msg.edit_text(
-            f"✅ IP `{escape_markdown(ip)}` removed from `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}` ({direction})",
-            parse_mode=ParseMode.MARKDOWN_V2)
+        # If we reach here, it was successful.
+        success_message = (
+            f"✅ *Rule Removed Successfully*\n\n"
+            f"Removed `{escape_markdown(ip)}/32` from `{escape_markdown(sg_id)}`\n"
+            f"on port `{escape_markdown(port)}` for `{direction}` traffic\."
+        )
+        update.message.reply_text(success_message, parse_mode=ParseMode.MARKDOWN_V2)
+
     except Exception as e:
-        logger.error("Error in /remove_ip: %s", e)
-        msg.edit_text(f"❌ Error removing rule: {str(e)}")
+        logger.error("Error in /remove_ip for user %s: %s", update.effective_user.id, e)
+        # If anything failed, send one clear, plain-text error message.
+        error_message = f"❌ An error occurred:\n\n{str(e)}"
+        update.message.reply_text(error_message)
 
 
 @user_authorized
