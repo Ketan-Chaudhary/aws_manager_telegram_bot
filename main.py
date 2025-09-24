@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 # --- AWS & Bot Configuration ---
 REGION = os.getenv("AWS_REGION", "ap-south-1")
 DYNAMODB_TABLE_NAME = "TelegramBotAuditLog"  # Table for Audit Logs
-ADMIN_CHAT_ID = 8498983488
+ADMIN_CHAT_ID = 8498983488  # Your Telegram user ID for reports
 
 # --- AWS Clients ---
 ssm = boto3.client("ssm", region_name=REGION)
@@ -102,7 +102,8 @@ def help_command(update, context):
     log_action(update.effective_user.id, "/help")
     commands = (
         "📌 *Available Commands:*\n\n"
-        "`/list [tag]` – List EC2 instances by tag (e.g., `/list dev`)\n"
+        "`/list` – List all EC2 instances\n"
+        "`/list <tag>` – Filter by `Environment` tag \(e\.g\., `/list dev`\)\n"
         "`/describe <id>` – Show instance details\n"
         "`/allocate_eip` – Allocate a new Elastic IP\n"
         "`/associate_eip <alloc_id> <inst_id>` – Associate EIP\n"
@@ -274,7 +275,8 @@ def cost_command(update, context):
                 itype = i['InstanceType']
                 cost = INSTANCE_PRICE_MAP.get(itype, 0)
                 total_cost += cost
-                instance_details.append(f"`{i['InstanceId']}` ({itype}): `${cost}/hr`")
+                # --- FIX IS HERE: Escaped the parentheses ---
+                instance_details.append(f"`{i['InstanceId']}` \({itype}\): `${cost}/hr`")
 
         hourly = total_cost
         daily = hourly * 24
@@ -289,6 +291,7 @@ def cost_command(update, context):
         )
         update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        logger.error("Error in /cost command: %s", e)
         update.message.reply_text(f"Error calculating cost: {e}")
 
 
@@ -317,7 +320,8 @@ def handle_callback(update, context):
             ec2.reboot_instances(InstanceIds=[iid])
             query.edit_message_text(f"🔄 Reboot initiated for `{iid}`", parse_mode=ParseMode.MARKDOWN_V2)
         elif action == "cancel":
-            query.edit_message_text("Cancelled.")
+            original_message = query.message.text
+            query.edit_message_text(original_message, parse_mode=ParseMode.MARKDOWN_V2)  # Revert to original text
 
         # Admin-only actions
         elif action in ["terminate_confirm1", "terminate_confirm2"]:
@@ -363,7 +367,7 @@ def daily_report(context):
                 f"🟢 *Running ({len(running)}):*\n" + (', '.join(running) if running else "None") + "\n\n"
                                                                                                    f"🔴 *Stopped ({len(stopped)}):*\n" + (
                     ', '.join(stopped) if stopped else "None") + "\n\n"
-                                                                 f"💰 *Est. Daily Cost:* `${daily_cost:.2f}`"
+                                                                 f"💰 *Est\. Daily Cost:* `${daily_cost:.2f}`"
         )
         context.bot.send_message(chat_id=ADMIN_CHAT_ID, text=msg, parse_mode=ParseMode.MARKDOWN_V2)
         log_action("SYSTEM", "daily_report", "Report sent successfully")
