@@ -285,44 +285,78 @@ def release_eip(update, context):
 
 @admin_only
 def add_ip_to_sg(update, context):
-    if len(context.args) != 2 or not SG_RE.match(context.args[0]):
-        return update.message.reply_text("Usage: `/add_ip <sg-id> <port>`", parse_mode=ParseMode.MARKDOWN_V2)
+    # New Usage: /add_ip <sg-id> <port> [inbound|outbound]
+    if not (2 <= len(context.args) <= 3) or not SG_RE.match(context.args[0]):
+        return update.message.reply_text("Usage: `/add_ip <sg-id> <port> [inbound|outbound]`",
+                                         parse_mode=ParseMode.MARKDOWN_V2)
 
-    sg_id, port = context.args
-    log_action(update.effective_user.id, "/add_ip", f"{sg_id}:{port}")
+    sg_id, port = context.args[0], context.args[1]
+    direction = 'inbound'
+    if len(context.args) == 3 and context.args[2].lower() == 'outbound':
+        direction = 'outbound'
+
+    log_action(update.effective_user.id, f"/add_ip ({direction})", f"{sg_id}:{port}")
+
+    msg = update.message.reply_text(f"🚀 Adding rule to `{escape_markdown(sg_id)}`...")
+
     try:
         ip = requests.get('https://api.ipify.org').text
-        ec2.authorize_security_group_ingress(
-            GroupId=sg_id,
-            IpPermissions=[
-                {'IpProtocol': 'tcp', 'FromPort': int(port), 'ToPort': int(port), 'IpRanges': [{'CidrIp': f'{ip}/32'}]}]
-        )
-        update.message.reply_text(
-            f"✅ IP `{escape_markdown(ip)}` added to `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}`",
+        ip_permission = {
+            'IpProtocol': 'tcp',
+            'FromPort': int(port),
+            'ToPort': int(port),
+            'IpRanges': [{'CidrIp': f'{ip}/32'}]
+        }
+
+        if direction == 'inbound':
+            ec2.authorize_security_group_ingress(GroupId=sg_id, IpPermissions=[ip_permission])
+        else:  # outbound
+            ec2.authorize_security_group_egress(GroupId=sg_id, IpPermissions=[ip_permission])
+
+        msg.edit_text(
+            f"✅ IP `{escape_markdown(ip)}` added to `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}` ({direction})",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        update.message.reply_text(f"Error: {str(e)}")
+        logger.error("Error in /add_ip: %s", e)
+        msg.edit_text(f"❌ Error adding rule: {str(e)}")
 
 
 @admin_only
 def remove_ip_from_sg(update, context):
-    if len(context.args) != 2 or not SG_RE.match(context.args[0]):
-        return update.message.reply_text("Usage: `/remove_ip <sg-id> <port>`", parse_mode=ParseMode.MARKDOWN_V2)
+    # New Usage: /remove_ip <sg-id> <port> [inbound|outbound]
+    if not (2 <= len(context.args) <= 3) or not SG_RE.match(context.args[0]):
+        return update.message.reply_text("Usage: `/remove_ip <sg-id> <port> [inbound|outbound]`",
+                                         parse_mode=ParseMode.MARKDOWN_V2)
 
-    sg_id, port = context.args
-    log_action(update.effective_user.id, "/remove_ip", f"{sg_id}:{port}")
+    sg_id, port = context.args[0], context.args[1]
+    direction = 'inbound'
+    if len(context.args) == 3 and context.args[2].lower() == 'outbound':
+        direction = 'outbound'
+
+    log_action(update.effective_user.id, f"/remove_ip ({direction})", f"{sg_id}:{port}")
+
+    msg = update.message.reply_text(f"🚀 Removing rule from `{escape_markdown(sg_id)}`...")
+
     try:
         ip = requests.get('https://api.ipify.org').text
-        ec2.revoke_security_group_ingress(
-            GroupId=sg_id,
-            IpPermissions=[
-                {'IpProtocol': 'tcp', 'FromPort': int(port), 'ToPort': int(port), 'IpRanges': [{'CidrIp': f'{ip}/32'}]}]
-        )
-        update.message.reply_text(
-            f"✅ IP `{escape_markdown(ip)}` removed from `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}`",
+        ip_permission = {
+            'IpProtocol': 'tcp',
+            'FromPort': int(port),
+            'ToPort': int(port),
+            'IpRanges': [{'CidrIp': f'{ip}/32'}]
+        }
+
+        if direction == 'inbound':
+            ec2.revoke_security_group_ingress(GroupId=sg_id, IpPermissions=[ip_permission])
+        else:  # outbound
+            ec2.revoke_security_group_egress(GroupId=sg_id, IpPermissions=[ip_permission])
+
+        msg.edit_text(
+            f"✅ IP `{escape_markdown(ip)}` removed from `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}` ({direction})",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        update.message.reply_text(f"Error: {str(e)}")
+        logger.error("Error in /remove_ip: %s", e)
+        msg.edit_text(f"❌ Error removing rule: {str(e)}")
 
 
 @user_authorized
