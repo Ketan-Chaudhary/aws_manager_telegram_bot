@@ -154,18 +154,22 @@ def list_instances(update, context):
                         InlineKeyboardButton("💥 Terminate", callback_data=f"terminate_confirm1:{iid}")
                     ]
                 ])
-                msg = f"*{escape_markdown(name)}* (`{escape_markdown(iid)}`)\nState: `{escape_markdown(state)}`"
-                update.message.reply_text(msg, reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+                # FINAL FIX: Send the message as plain text to guarantee it never fails.
+                msg = f"Name: {name}\nID: {iid}\nState: {state}"
+                update.message.reply_text(msg, reply_markup=keyboard)
 
         if not instances_found:
             update.message.reply_text(
                 f"No instances found with tag '{tag_filter}'." if tag_filter else "No running or stopped instances found.")
     except Exception as e:
         logger.error("Error in /list: %s", e)
-        # FIX: Escape the error message itself before sending
-        error_msg = f"An error occurred\. This is likely an IAM permissions issue\. Please check the bot's role policy\.\n\n*Details:* `{escape_markdown(str(e))}`"
-        update.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN_V2)
+        # Send errors as plain text to avoid parsing issues.
+        error_msg = f"An error occurred. This is likely an IAM permissions issue.\n\nDetails: {str(e)}"
+        update.message.reply_text(error_msg)
 
+
+# ... (The rest of the code remains the same as the previous full version)
+# I am including the full code again below for completeness.
 
 @user_authorized
 def describe_instance(update, context):
@@ -194,8 +198,7 @@ def describe_instance(update, context):
         )
         update.message.reply_text(details, parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        # FIX: Escape the error message
-        update.message.reply_text(f"Error describing instance: {escape_markdown(str(e))}")
+        update.message.reply_text(f"Error describing instance: {str(e)}")
 
 
 @user_authorized
@@ -228,8 +231,7 @@ def cost_command(update, context):
         update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
         logger.error("Error in /cost command: %s", e)
-        # FIX: Escape the error message
-        update.message.reply_text(f"Error calculating cost: {escape_markdown(str(e))}")
+        update.message.reply_text(f"Error calculating cost: {str(e)}")
 
 
 @admin_only
@@ -242,8 +244,7 @@ def allocate_eip(update, context):
         update.message.reply_text(f"✅ EIP Allocated\n*IP:* `{ip}`\n*Allocation ID:* `{alloc_id}`",
                                   parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        # FIX: Escape the error message
-        update.message.reply_text(f"Error: {escape_markdown(str(e))}")
+        update.message.reply_text(f"Error: {str(e)}")
 
 
 @admin_only
@@ -260,8 +261,7 @@ def associate_eip(update, context):
             f"✅ EIP `{escape_markdown(alloc_id)}` associated with instance `{escape_markdown(iid)}`",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        # FIX: Escape the error message
-        update.message.reply_text(f"Error: {escape_markdown(str(e))}")
+        update.message.reply_text(f"Error: {str(e)}")
 
 
 @admin_only
@@ -275,8 +275,7 @@ def release_eip(update, context):
         ec2.release_address(AllocationId=alloc_id)
         update.message.reply_text(f"✅ EIP `{escape_markdown(alloc_id)}` released.", parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        # FIX: Escape the error message
-        update.message.reply_text(f"Error: {escape_markdown(str(e))}")
+        update.message.reply_text(f"Error: {str(e)}")
 
 
 @admin_only
@@ -297,8 +296,7 @@ def add_ip_to_sg(update, context):
             f"✅ IP `{escape_markdown(ip)}` added to `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}`",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        # FIX: Escape the error message
-        update.message.reply_text(f"Error: {escape_markdown(str(e))}")
+        update.message.reply_text(f"Error: {str(e)}")
 
 
 @admin_only
@@ -319,11 +317,10 @@ def remove_ip_from_sg(update, context):
             f"✅ IP `{escape_markdown(ip)}` removed from `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}`",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        # FIX: Escape the error message
-        update.message.reply_text(f"Error: {escape_markdown(str(e))}")
+        update.message.reply_text(f"Error: {str(e)}")
 
 
-# --- Callback Handler for Inline Buttons ---
+@user_authorized
 def handle_callback(update, context):
     query = update.callback_query
     query.answer()
@@ -348,7 +345,7 @@ def handle_callback(update, context):
             ec2.reboot_instances(InstanceIds=[iid])
             query.edit_message_text(f"🔄 Reboot initiated for `{escaped_iid}`", parse_mode=ParseMode.MARKDOWN_V2)
         elif action == "cancel":
-            query.edit_message_text(query.message.text_markdown_v2, parse_mode=ParseMode.MARKDOWN_V2)
+            query.edit_message_text(query.message.text)  # Revert to the original plain text
         elif action in ["terminate_confirm1", "terminate_confirm2"]:
             if user.id not in ADMIN_USERS:
                 return query.edit_message_text("Admin access required to terminate.")
@@ -358,18 +355,16 @@ def handle_callback(update, context):
                     [InlineKeyboardButton("🚨 YES, I AM SURE", callback_data=f"terminate_confirm2:{iid}")],
                     [InlineKeyboardButton("Cancel", callback_data=f"cancel:{iid}")]
                 ])
-                query.edit_message_text(f"⚠️ *ARE YOU ABSOLUTELY SURE* you want to terminate `{escaped_iid}`?",
-                                        reply_markup=keyboard, parse_mode=ParseMode.MARKDOWN_V2)
+                query.edit_message_text(f"⚠️ ARE YOU ABSOLUTELY SURE you want to terminate {iid}?",
+                                        reply_markup=keyboard)  # Plain text for safety
 
             elif action == "terminate_confirm2":
                 ec2.terminate_instances(InstanceIds=[iid])
                 query.edit_message_text(f"💥 Termination started for `{escaped_iid}`", parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
-        # FIX: Escape the error message
-        query.edit_message_text(f"Error: {escape_markdown(str(e))}")
+        query.edit_message_text(f"Error: {str(e)}")
 
 
-# --- Daily Report Scheduler ---
 def daily_report(context):
     try:
         resp = ec2.describe_instances(Filters=[{"Name": "instance-state-name", "Values": ["running", "stopped"]}])
@@ -401,7 +396,6 @@ def daily_report(context):
         log_action("SYSTEM", "daily_report", f"Failed: {e}")
 
 
-# --- Main Bot Setup ---
 def main():
     updater = Updater(token=TOKEN, use_context=True)
     dp = updater.dispatcher
