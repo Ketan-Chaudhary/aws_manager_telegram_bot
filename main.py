@@ -162,7 +162,9 @@ def list_instances(update, context):
                 f"No instances found with tag '{tag_filter}'." if tag_filter else "No running or stopped instances found.")
     except Exception as e:
         logger.error("Error in /list: %s", e)
-        update.message.reply_text(f"An error occurred. Check IAM permissions. Error: {escape_markdown(str(e))}")
+        # FIX: Escape the error message itself before sending
+        error_msg = f"An error occurred\. This is likely an IAM permissions issue\. Please check the bot's role policy\.\n\n*Details:* `{escape_markdown(str(e))}`"
+        update.message.reply_text(error_msg, parse_mode=ParseMode.MARKDOWN_V2)
 
 
 @user_authorized
@@ -192,6 +194,7 @@ def describe_instance(update, context):
         )
         update.message.reply_text(details, parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        # FIX: Escape the error message
         update.message.reply_text(f"Error describing instance: {escape_markdown(str(e))}")
 
 
@@ -225,6 +228,7 @@ def cost_command(update, context):
         update.message.reply_text(msg, parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
         logger.error("Error in /cost command: %s", e)
+        # FIX: Escape the error message
         update.message.reply_text(f"Error calculating cost: {escape_markdown(str(e))}")
 
 
@@ -238,6 +242,7 @@ def allocate_eip(update, context):
         update.message.reply_text(f"✅ EIP Allocated\n*IP:* `{ip}`\n*Allocation ID:* `{alloc_id}`",
                                   parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        # FIX: Escape the error message
         update.message.reply_text(f"Error: {escape_markdown(str(e))}")
 
 
@@ -255,6 +260,7 @@ def associate_eip(update, context):
             f"✅ EIP `{escape_markdown(alloc_id)}` associated with instance `{escape_markdown(iid)}`",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        # FIX: Escape the error message
         update.message.reply_text(f"Error: {escape_markdown(str(e))}")
 
 
@@ -269,6 +275,7 @@ def release_eip(update, context):
         ec2.release_address(AllocationId=alloc_id)
         update.message.reply_text(f"✅ EIP `{escape_markdown(alloc_id)}` released.", parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        # FIX: Escape the error message
         update.message.reply_text(f"Error: {escape_markdown(str(e))}")
 
 
@@ -290,6 +297,7 @@ def add_ip_to_sg(update, context):
             f"✅ IP `{escape_markdown(ip)}` added to `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}`",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        # FIX: Escape the error message
         update.message.reply_text(f"Error: {escape_markdown(str(e))}")
 
 
@@ -311,6 +319,7 @@ def remove_ip_from_sg(update, context):
             f"✅ IP `{escape_markdown(ip)}` removed from `{escape_markdown(sg_id)}` on port `{escape_markdown(port)}`",
             parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        # FIX: Escape the error message
         update.message.reply_text(f"Error: {escape_markdown(str(e))}")
 
 
@@ -356,6 +365,7 @@ def handle_callback(update, context):
                 ec2.terminate_instances(InstanceIds=[iid])
                 query.edit_message_text(f"💥 Termination started for `{escaped_iid}`", parse_mode=ParseMode.MARKDOWN_V2)
     except Exception as e:
+        # FIX: Escape the error message
         query.edit_message_text(f"Error: {escape_markdown(str(e))}")
 
 
