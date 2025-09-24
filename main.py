@@ -172,6 +172,7 @@ def list_instances(update, context):
 # I am including the full code again below for completeness.
 
 @user_authorized
+@user_authorized
 def describe_instance(update, context):
     user_id = update.effective_user.id
     if len(context.args) != 1 or not INSTANCE_RE.match(context.args[0]):
@@ -183,6 +184,10 @@ def describe_instance(update, context):
         resp = ec2.describe_instances(InstanceIds=[iid])
         i = resp["Reservations"][0]["Instances"][0]
 
+        # --- MODIFICATION IS HERE ---
+        # Create a formatted list of Security Group names and IDs
+        sg_details = [f"{sg['GroupName']} ({sg['GroupId']})" for sg in i.get('SecurityGroups', [])]
+
         name = escape_markdown(next((t["Value"] for t in i.get("Tags", []) if t["Key"] == "Name"), "-"))
         details = (
             f"*Instance Details:*\n\n"
@@ -193,7 +198,7 @@ def describe_instance(update, context):
             f"⚡ *State:* `{escape_markdown(i['State']['Name'])}`\n"
             f"🌐 *Public IP:* `{escape_markdown(i.get('PublicIpAddress', '-'))}`\n"
             f"🔒 *Private IP:* `{escape_markdown(i.get('PrivateIpAddress', '-'))}`\n"
-            f"🛡 *SGs:* `{escape_markdown(', '.join([sg['GroupName'] for sg in i['SecurityGroups']]))}`\n"
+            f"🛡 *SGs:* `{escape_markdown(', '.join(sg_details))}`\n"  # Use the new formatted list
             f"⏱ *Launch Time:* `{escape_markdown(i['LaunchTime'].strftime('%Y-%m-%d %H:%M'))}`"
         )
         update.message.reply_text(details, parse_mode=ParseMode.MARKDOWN_V2)
